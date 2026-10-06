@@ -229,8 +229,8 @@ test("capture encrypted Chrome traffic, import HTTP/1 and multiplexed HTTP/2, an
         entrypoint: url,
         captures: [archive],
         modules: [],
-        seeds: { default: { description: "", apply() {} } },
-        defaultSeed: "default",
+        scenarios: { default: { description: "", initialize() {} } },
+        defaultScenario: "default",
       }),
     );
     const instance = await new WebsimClient(server).createInstance();

@@ -9,6 +9,7 @@
       <label>Amount in GBP <input name="amount" type="number" /></label>
       <button>Add money</button>
     </form>
+    <p role="status" aria-label="Deposit result"></p>
     <script>
       const balance = document.querySelector("output");
       function render(account) {
@@ -25,7 +26,10 @@
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ amount }),
         });
-        render(await response.json());
+        const data = await response.json();
+        document.querySelector('[role="status"]').textContent =
+          data.error || "Deposit complete";
+        if (response.ok) render(data);
       };
     </script>
   </body>

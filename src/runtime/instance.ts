@@ -19,7 +19,7 @@ export class Instance {
   readonly state = new StateStore();
   readonly createdAt = new Date();
   readonly expiresAt: Date;
-  readonly seed: string;
+  readonly scenario: string;
   private tail: Promise<unknown> = Promise.resolve();
   private closed = false;
   private traces: RequestTrace[] = [];
@@ -28,17 +28,6 @@ export class Instance {
   private revision = 0;
   private context!: SimulationContext;
   private apps = new Map<string, Hono<SimulationEnv>>();
-  private overrides = new Map<
-    string,
-    {
-      method: string;
-      url: string;
-      status: number;
-      body: string;
-      headers?: Record<string, string>;
-      remaining: number;
-    }
-  >();
   constructor(
     readonly definition: SimulationDefinition,
     private readonly options: InstanceOptions = {},
@@ -47,9 +36,9 @@ export class Instance {
       definition.replay ?? {},
     ),
   ) {
-    this.seed = options.seed ?? definition.defaultSeed;
-    if (!definition.seeds[this.seed])
-      throw new Error(`Unknown seed: ${this.seed}`);
+    this.scenario = options.scenario ?? definition.defaultScenario;
+    if (!definition.scenarios[this.scenario])
+      throw new Error(`Unknown scenario: ${this.scenario}`);
     this.expiresAt = new Date(Date.now() + (options.ttlMs ?? 3_600_000));
     this.initialize();
     for (const module of definition.modules) {
@@ -80,6 +69,9 @@ export class Instance {
       throw new Error("Invalid simulation time");
     this.context = {
       state: this.state,
+      behavior: Object.freeze({
+        ...this.definition.scenarios[this.scenario]!.behavior,
+      }),
       clock: { now: () => new Date(epoch) },
       random: () => {
         random = (Math.imul(1664525, random) + 1013904223) >>> 0;
@@ -92,7 +84,7 @@ export class Instance {
             .padStart(8, "0"),
         ).join(""),
     };
-    this.definition.seeds[this.seed]!.apply(this.context);
+    this.definition.scenarios[this.scenario]!.initialize?.(this.context);
     for (const [collection, documents] of Object.entries(
       this.options.state ?? {},
     ))
@@ -110,7 +102,7 @@ export class Instance {
   info(): InstanceInfo {
     return {
       id: this.id,
-      seed: this.seed,
+      scenario: this.scenario,
       createdAt: this.createdAt.toISOString(),
       expiresAt: this.expiresAt.toISOString(),
       requests: this.count,
@@ -133,7 +125,6 @@ export class Instance {
       this.traces = [];
       this.failures = [];
       this.count = 0;
-      this.overrides.clear();
       this.revision++;
     });
   }
@@ -141,20 +132,6 @@ export class Instance {
     return this.run(() => {
       this.closed = true;
       this.state.close();
-    });
-  }
-  override(value: {
-    method: string;
-    url: string;
-    status: number;
-    body: string;
-    headers?: Record<string, string>;
-    times?: number;
-  }): Promise<string> {
-    return this.run(() => {
-      const id = randomUUID();
-      this.overrides.set(id, { ...value, remaining: value.times ?? 1 });
-      return id;
     });
   }
   reportFailure(url: string, diagnostic: Diagnostic): Promise<void> {
@@ -191,32 +168,17 @@ export class Instance {
       this.state.beginRecording();
       let response: Response | undefined;
       try {
-        for (const [id, override] of this.overrides) {
-          if (
-            override.method === request.method &&
-            override.url === request.url
-          ) {
-            response = new Response(
-              [204, 205, 304].includes(override.status) ? null : override.body,
-              { status: override.status, headers: override.headers },
-            );
-            if (--override.remaining === 0) this.overrides.delete(id);
-            trace.source = `override:${id}`;
+        for (const module of this.definition.modules) {
+          if (module.origin !== new URL(request.url).origin) continue;
+          const candidate = await this.apps
+            .get(module.name)!
+            .fetch(request.clone());
+          if (candidate.headers.get("x-websim-fallthrough") !== "1") {
+            response = candidate;
+            trace.source = `module:${module.name}`;
             break;
           }
         }
-        if (!response)
-          for (const module of this.definition.modules) {
-            if (module.origin !== new URL(request.url).origin) continue;
-            const candidate = await this.apps
-              .get(module.name)!
-              .fetch(request.clone());
-            if (candidate.headers.get("x-websim-fallthrough") !== "1") {
-              response = candidate;
-              trace.source = `module:${module.name}`;
-              break;
-            }
-          }
         if (!response) {
           const result = await this.replay.match(request.clone());
           response = result?.response;

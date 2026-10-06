@@ -105,8 +105,8 @@ test("sealed runner supports independent scenario state while blocking browser a
       await raw.close();
       expect((await execute("docker", ["logs", witness])).stdout).toBe(before);
       const client = new WebsimClient(sandbox);
-      const first = await client.createInstance({ seed: "funded" });
-      const second = await client.createInstance({ seed: "empty" });
+      const first = await client.createInstance({ scenario: "funded" });
+      const second = await client.createInstance({ scenario: "empty" });
       const session = await createBrowserSession(browser, first);
       const bank = await session.context.newPage();
       await bank.goto("https://north.example/");

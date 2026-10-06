@@ -2,7 +2,13 @@ import type { Hono } from "hono";
 import type { StateStore } from "./state.js";
 import type { CaptureArchive } from "../capture/archive.js";
 
+/** Immutable scenario settings. Mutable counters and progress belong in state. */
+export type ScenarioBehavior = Readonly<
+  Record<string, string | number | boolean | null>
+>;
+
 export interface SimulationContext {
+  readonly behavior: ScenarioBehavior;
   readonly state: StateStore;
   readonly clock: { now(): Date };
   random(): number;
@@ -16,9 +22,11 @@ export interface SimulationModule {
   routes: Hono<SimulationEnv>;
   evidence?: "observed" | "inferred" | "authored";
 }
-export interface Seed {
+export interface Scenario {
   description: string;
-  apply(context: SimulationContext): void;
+  behavior?: ScenarioBehavior;
+  /** Runs on instance creation and reset. */
+  initialize?(context: SimulationContext): void;
 }
 export interface ReplayPolicy {
   ignoreQuery?: string[];
@@ -30,20 +38,20 @@ export interface SimulationDefinition {
   description: string;
   entrypoint: string;
   modules: SimulationModule[];
-  seeds: Record<string, Seed>;
-  defaultSeed: string;
+  scenarios: Record<string, Scenario>;
+  defaultScenario: string;
   captures?: CaptureArchive[];
   replay?: ReplayPolicy;
 }
 export function defineSimulation(
   definition: SimulationDefinition,
 ): SimulationDefinition {
-  if (!definition?.seeds || !Array.isArray(definition.modules))
+  if (!definition?.scenarios || !Array.isArray(definition.modules))
     throw new Error(
       "Configuration must export a simulation definition or an async factory returning one.",
     );
-  if (!definition.seeds[definition.defaultSeed])
-    throw new Error("defaultSeed must name a declared seed");
+  if (!definition.scenarios[definition.defaultScenario])
+    throw new Error("defaultScenario must name a declared scenario");
   const names = new Set<string>();
   for (const module of definition.modules) {
     if (names.has(module.name))
@@ -93,7 +101,7 @@ export interface RequestTrace {
   stateChanges?: StateChange[];
 }
 export interface InstanceOptions {
-  seed?: string;
+  scenario?: string;
   time?: string;
   randomSeed?: number;
   ttlMs?: number;
@@ -101,7 +109,7 @@ export interface InstanceOptions {
 }
 export interface InstanceInfo {
   id: string;
-  seed: string;
+  scenario: string;
   createdAt: string;
   expiresAt: string;
   requests: number;

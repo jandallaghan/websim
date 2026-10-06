@@ -30,8 +30,8 @@ test("capture a website, turn off the origin, and run independent stateful brows
   await origin.close(); // Replay cannot succeed by accidentally falling back to the origin.
   const server = await startServer(banking(origin.url, archive));
   const client = new WebsimClient(server);
-  const first = await client.createInstance({ seed: "funded" });
-  const second = await client.createInstance({ seed: "empty" });
+  const first = await client.createInstance({ scenario: "funded" });
+  const second = await client.createInstance({ scenario: "empty" });
   const alice = await createBrowserSession(browser, first);
   const bob = await createBrowserSession(browser, second);
   try {
@@ -65,10 +65,11 @@ test("capture a website, turn off the origin, and run independent stateful brows
   }
 });
 
-test("application failures, one-shot overrides, diagnostics and authenticated management stay distinct", async () => {
+test("scenario failures recover and reset independently of simulation diagnostics", async () => {
   const server = await startServer(banking("https://bank.example"));
   const client = new WebsimClient(server);
-  const instance = await client.createInstance();
+  const instance = await client.createInstance({ scenario: "maintenance" });
+  const other = await client.createInstance();
   const request = {
     url: "https://bank.example/account",
     method: "GET",
@@ -87,15 +88,16 @@ test("application failures, one-shot overrides, diagnostics and authenticated ma
         })
       ).status,
     ).toBe(403);
-    await instance.override({
-      method: "GET",
-      url: request.url,
-      status: 503,
-      body: "Maintenance",
-    });
     expect((await instance.dispatch(request)).status).toBe(503);
     await instance.assertHealthy();
+    expect((await other.dispatch(request)).status).toBe(200);
     expect((await instance.dispatch(request)).status).toBe(200);
+    await instance.reset();
+    expect((await instance.dispatch(request)).status).toBe(503);
+    expect((await other.dispatch(request)).status).toBe(200);
+    expect((await instance.inspect()).traces[0]?.source).toBe(
+      "module:accounts",
+    );
     const missing = await instance.dispatch({
       ...request,
       url: "https://bank.example/unknown",

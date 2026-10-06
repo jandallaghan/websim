@@ -13,8 +13,8 @@ export function InstanceControls({
   selected,
   select,
   definition,
-  seed,
-  setSeed,
+  scenario,
+  setScenario,
   busy,
   create,
 }: {
@@ -22,8 +22,8 @@ export function InstanceControls({
   selected?: string;
   select(id: string): void;
   definition: Definition;
-  seed: string;
-  setSeed(seed: string): void;
+  scenario: string;
+  setScenario(scenario: string): void;
   busy: boolean;
   create(): Promise<boolean>;
 }) {
@@ -47,7 +47,7 @@ export function InstanceControls({
             )}
             {instances.map((instance) => (
               <NativeSelectOption key={instance.id} value={instance.id}>
-                {instance.seed} · {instance.id.slice(0, 8)}
+                {instance.scenario} · {instance.id.slice(0, 8)}
               </NativeSelectOption>
             ))}
           </NativeSelect>
@@ -75,19 +75,19 @@ export function InstanceControls({
             });
           }}
         >
-          <label htmlFor="instance-seed" className="mr-1 text-sm">
-            {starting ? "Starting state" : "New instance"}
+          <label htmlFor="instance-scenario" className="mr-1 text-sm">
+            Scenario
           </label>
           <NativeSelect
-            id="instance-seed"
-            aria-label="Seed"
+            id="instance-scenario"
+            aria-label="Scenario"
             disabled={busy}
-            value={seed}
-            onChange={(event) => setSeed(event.target.value)}
+            value={scenario}
+            onChange={(event) => setScenario(event.target.value)}
           >
-            {definition.seeds.map((seed) => (
-              <NativeSelectOption key={seed.name}>
-                {seed.name}
+            {definition.scenarios.map((scenario) => (
+              <NativeSelectOption key={scenario.name}>
+                {scenario.name}
               </NativeSelectOption>
             ))}
           </NativeSelect>

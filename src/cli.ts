@@ -180,10 +180,10 @@ export default async function simulation() {
     entrypoint: ${JSON.stringify(entrypoint)},
     captures: [capture],
     modules: [],
-    seeds: {
-      default: { description: "Recorded starting state", apply() {} },
+    scenarios: {
+      default: { description: "Recorded workflow" },
     },
-    defaultSeed: "default",
+    defaultScenario: "default",
   });
 }
 `;

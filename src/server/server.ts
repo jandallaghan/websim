@@ -11,7 +11,6 @@ import {
   encodeResponse,
   instanceOptionsSchema,
   wireRequestSchema,
-  overrideSchema,
   diagnosticSchema,
 } from "./protocol.js";
 import { WebsimClient } from "../sdk/client.js";
@@ -73,11 +72,13 @@ export async function startServer(
       name: definition.name,
       description: definition.description,
       entrypoint: definition.entrypoint,
-      defaultSeed: definition.defaultSeed,
-      seeds: Object.entries(definition.seeds).map(([name, seed]) => ({
-        name,
-        description: seed.description,
-      })),
+      defaultScenario: definition.defaultScenario,
+      scenarios: Object.entries(definition.scenarios).map(
+        ([name, scenario]) => ({
+          name,
+          description: scenario.description,
+        }),
+      ),
       modules: definition.modules.map(({ name, origin, evidence }) => ({
         name,
         origin,
@@ -128,13 +129,6 @@ export async function startServer(
           .dispatch(decodeRequest(wireRequestSchema.parse(await c.req.json()))),
       ),
     ),
-  );
-  app.post("/api/instances/:id/overrides", async (c) =>
-    c.json({
-      id: await manager
-        .get(c.req.param("id"))!
-        .override(overrideSchema.parse(await c.req.json())),
-    }),
   );
   app.post("/api/instances/:id/diagnostics", async (c) => {
     const input = diagnosticSchema.parse(await c.req.json());

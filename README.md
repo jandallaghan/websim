@@ -41,7 +41,32 @@ For an existing simulation to try, see the [Demoblaze storefront example](exampl
 
 ## Scenarios and state
 
-Seeds define starting conditions: an empty cart, an existing customer, or an account with insufficient funds. Handlers update that state as the browser interacts with the site. Response overrides can introduce specific failures.
+Scenarios define starting state and behavior: an empty cart, an existing customer, or an unavailable checkout. Handlers read behavior settings and update state as the browser interacts with the site.
+
+```ts
+scenarios: {
+  "checkout-unavailable": {
+    description: "An existing customer whose checkout service is unavailable.",
+    behavior: { checkout: "unavailable" },
+    initialize({ state }) {
+      state.set("users", "demo", { name: "Demo customer" });
+    },
+  },
+},
+defaultScenario: "checkout-unavailable",
+```
+
+In a Hono handler:
+
+```ts
+const { behavior, state } = c.get("simulation");
+if (behavior.checkout === "unavailable") {
+  return c.json({ error: "Checkout is temporarily unavailable" }, 503);
+}
+// Continue the normal checkout using instance state.
+```
+
+Behavior settings are immutable strings, numbers, booleans, or null. Track changing conditions, such as retry attempts, in state. Resetting an instance reruns its scenario initializer and clears its request history.
 
 Each instance has separate state, browser contexts, and request history, so tests can run different scenarios against the same simulation without interfering with each other.
 
@@ -54,7 +79,7 @@ const sandbox = await startSandbox({
 
 try {
   const client = new WebsimClient(sandbox);
-  const instance = await client.createInstance({ seed: "saved-cart" });
+  const instance = await client.createInstance({ scenario: "saved-cart" });
   const browser = await sandbox.connectBrowser();
   const session = await createBrowserSession(browser, instance);
   const page = await session.context.newPage();

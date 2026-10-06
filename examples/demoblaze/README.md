@@ -20,7 +20,7 @@ Start `empty` or `saved-cart` in the inspector, then open its managed browser. T
 
 - Captured: homepage, product detail shell, cart shell, scripts, styles, fonts, product images, public catalog/category requests, and anonymous cart requests.
 - Catalog module: derived from observed product data, with generalized filtering, pagination, and detail lookup.
-- Authentication: inferred from the captured JavaScript's `/login`, `/check`, and `/signup` contracts. Credentials and sessions are local seeded data.
+- Authentication: inferred from the captured JavaScript's `/login`, `/check`, and `/signup` contracts. Credentials and sessions are local scenario state.
 - Cart: inferred from `/addtocart`, `/viewcart`, `/deleteitem`, and `/deletecart` calls. State is per instance and cart ownership follows the site's anonymous-cookie or authenticated-user convention.
 - Checkout: the original frontend generates its success dialog. We observe its delete-cart request and record a local order before clearing the cart. This is authored bookkeeping, not a claim that the real backend exposes an orders API.
 - Background media: an explicitly authored finite empty HLS playlist. Video playback is outside this example's scope.

@@ -32,9 +32,14 @@ export async function startBank() {
 }
 export function banking(origin: string, archive?: CaptureArchive) {
   const routes = new Hono<SimulationEnv>();
-  routes.get("/account", (c) =>
-    c.json(c.get("simulation").state.get("accounts", "main")),
-  );
+  routes.get("/account", (c) => {
+    const { state, behavior } = c.get("simulation");
+    const attempts = state.get<number>("requests", "account") ?? 0;
+    state.set("requests", "account", attempts + 1);
+    if (attempts < Number(behavior.accountFailures ?? 0))
+      return c.text("Maintenance", 503);
+    return c.json(state.get("accounts", "main"));
+  });
   routes.post("/deposit", async (c) => {
     const { amount } = await c.req.json();
     if (!Number.isSafeInteger(amount) || amount <= 0)
@@ -54,16 +59,24 @@ export function banking(origin: string, archive?: CaptureArchive) {
     entrypoint: `${origin}/`,
     modules: [{ name: "accounts", origin, routes }],
     captures: archive ? [archive] : [],
-    seeds: {
+    scenarios: {
+      maintenance: {
+        description: "The first account request fails, then service recovers.",
+        behavior: { accountFailures: 1 },
+        initialize: ({ state }) =>
+          state.set("accounts", "main", { balance: 10000 }),
+      },
       funded: {
         description: "An account with £100",
-        apply: ({ state }) => state.set("accounts", "main", { balance: 10000 }),
+        initialize: ({ state }) =>
+          state.set("accounts", "main", { balance: 10000 }),
       },
       empty: {
         description: "An account with £0",
-        apply: ({ state }) => state.set("accounts", "main", { balance: 0 }),
+        initialize: ({ state }) =>
+          state.set("accounts", "main", { balance: 0 }),
       },
     },
-    defaultSeed: "funded",
+    defaultScenario: "funded",
   });
 }

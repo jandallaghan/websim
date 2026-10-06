@@ -14,7 +14,7 @@ export function useWorkbench() {
   const [instances, setInstances] = useState<InstanceInfo[]>([]);
   const [selected, setSelected] = useState<string>();
   const [inspection, setInspection] = useState<InstanceInspection>();
-  const [seed, setSeed] = useState("");
+  const [scenario, setScenario] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [revision, setRevision] = useState(0);
@@ -49,7 +49,7 @@ export function useWorkbench() {
       .then((value) => {
         if (active) {
           setDefinition(value);
-          setSeed(value.defaultSeed);
+          setScenario(value.defaultScenario);
         }
       })
       .catch((error) => {
@@ -104,7 +104,7 @@ export function useWorkbench() {
   async function create() {
     return act(async () => {
       const instance = await api<InstanceInfo>(`${base}/instances`, "POST", {
-        seed,
+        scenario,
       });
       setInstances((current) => [...current, instance]);
       setSelected(instance.id);
@@ -133,8 +133,8 @@ export function useWorkbench() {
     selected,
     setSelected,
     inspection,
-    seed,
-    setSeed,
+    scenario,
+    setScenario,
     error,
     setError,
     busy,

@@ -30,11 +30,10 @@ const test = websimTest.extend<
 });
 test.use({
   websimOptions: {
-    seed: "empty",
-    state: { accounts: { main: { balance: 2500 } } },
+    scenario: "deposit-retry",
   },
 });
-test("the public fixture owns isolation, typed state inspection and automatic healthy teardown", async ({
+test("a scenario drives browser failure, recovery and reset through domain handlers", async ({
   page,
   websim,
 }) => {
@@ -42,13 +41,21 @@ test("the public fixture owns isolation, typed state inspection and automatic he
   await expect(page.getByLabel("Balance")).toHaveText("£25.00");
   await page.getByLabel("Amount in GBP").fill("50");
   await page.getByRole("button", { name: "Add money" }).click();
+  await expect(page.getByRole("status", { name: "Deposit result" })).toHaveText(
+    "Deposits unavailable. Try again.",
+  );
+  await expect(page.getByLabel("Balance")).toHaveText("£25.00");
+  await websim.assertHealthy();
+  await page.getByRole("button", { name: "Add money" }).click();
   await expect(page.getByLabel("Balance")).toHaveText("£75.00");
   expect(
     await websim.readState<{ balance: number }>("accounts", "main"),
   ).toEqual({ balance: 7500 });
   const { traces } = await websim.inspect();
   expect(
-    traces.find((trace) => trace.url.endsWith("/api/deposits"))?.stateChanges,
+    traces.find(
+      (trace) => trace.url.endsWith("/api/deposits") && trace.status === 200,
+    )?.stateChanges,
   ).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
@@ -58,4 +65,13 @@ test("the public fixture owns isolation, typed state inspection and automatic he
       }),
     ]),
   );
+  await websim.reset();
+  await page.reload();
+  await expect(page.getByLabel("Balance")).toHaveText("£25.00");
+  await page.getByLabel("Amount in GBP").fill("50");
+  await page.getByRole("button", { name: "Add money" }).click();
+  await expect(page.getByRole("status", { name: "Deposit result" })).toHaveText(
+    "Deposits unavailable. Try again.",
+  );
+  await expect(page.getByLabel("Balance")).toHaveText("£25.00");
 });

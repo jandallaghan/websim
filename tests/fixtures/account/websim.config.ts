@@ -14,15 +14,22 @@ export default defineSimulation({
     { name: "website", origin: "https://north.example", routes: site },
     { name: "accounts", origin: "https://north.example", routes: accounts },
   ],
-  seeds: {
+  scenarios: {
+    "deposit-retry": {
+      description: "The first deposit fails without changing the balance.",
+      behavior: { depositFailures: 1 },
+      initialize: ({ state }) =>
+        state.set("accounts", "main", { balance: 2500 }),
+    },
     funded: {
       description: "A personal account with £100 and no transactions.",
-      apply: ({ state }) => state.set("accounts", "main", { balance: 10000 }),
+      initialize: ({ state }) =>
+        state.set("accounts", "main", { balance: 10000 }),
     },
     empty: {
       description: "A new personal account with a zero balance.",
-      apply: ({ state }) => state.set("accounts", "main", { balance: 0 }),
+      initialize: ({ state }) => state.set("accounts", "main", { balance: 0 }),
     },
   },
-  defaultSeed: "funded",
+  defaultScenario: "funded",
 });

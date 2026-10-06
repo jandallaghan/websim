@@ -43,7 +43,7 @@ test("workspace switches between isolated simulations, inspects state, and contr
     await page
       .getByRole("button", { name: "New instance", exact: true })
       .click();
-    await page.getByLabel("Seed", { exact: true }).selectOption("empty");
+    await page.getByLabel("Scenario", { exact: true }).selectOption("empty");
     await page
       .getByRole("button", { name: "Create instance", exact: true })
       .click();
@@ -125,7 +125,7 @@ test("workspace switches between isolated simulations, inspects state, and contr
       .getByRole("button", { name: "Close", exact: true })
       .click();
     await page.getByRole("button", { name: "bank-b", exact: true }).click();
-    await page.getByLabel("Seed", { exact: true }).selectOption("empty");
+    await page.getByLabel("Scenario", { exact: true }).selectOption("empty");
     await page.getByRole("button", { name: "Start instance" }).click();
     await page.getByRole("tab", { name: "State", exact: true }).click();
     await expect(page.locator("pre")).toContainText('"balance": 0');

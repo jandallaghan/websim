@@ -19,7 +19,7 @@ test("real captured storefront: browse, reject a bad password, log in, mutate a 
   const browser = await server.connectBrowser();
   const client = new WebsimClient(server);
   const instance = await client.createInstance();
-  const other = await client.createInstance({ seed: "saved-cart" });
+  const other = await client.createInstance({ scenario: "saved-cart" });
   const session = await createBrowserSession(browser, instance);
   try {
     const page = await session.context.newPage();

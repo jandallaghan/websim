@@ -52,17 +52,17 @@ export default defineSimulation({
       evidence: "authored",
     },
   ],
-  seeds: {
+  scenarios: {
     empty: {
       description: "An empty cart. Log in with demo / websim.",
-      apply({ state }) {
+      initialize({ state }) {
         state.set("users", "demo", { username: "demo", password: "websim" });
       },
     },
     "saved-cart": {
       description:
         "The demo user already has a Samsung Galaxy S6 in their cart.",
-      apply({ state }) {
+      initialize({ state }) {
         state.set("users", "demo", { username: "demo", password: "websim" });
         state.set("cart", "saved-phone", {
           id: "saved-phone",
@@ -72,5 +72,5 @@ export default defineSimulation({
       },
     },
   },
-  defaultSeed: "empty",
+  defaultScenario: "empty",
 });

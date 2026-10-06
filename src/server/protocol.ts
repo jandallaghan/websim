@@ -2,7 +2,7 @@ import { z } from "zod";
 export const instanceOptionsSchema = z
   .object({
     state: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
-    seed: z.string().optional(),
+    scenario: z.string().optional(),
     time: z.iso.datetime().optional(),
     randomSeed: z.number().int().optional(),
     ttlMs: z.number().int().min(1000).max(86_400_000).optional(),
@@ -44,15 +44,6 @@ export function decodeRequest(request: WireRequest): Request {
         : Buffer.from(request.body, "base64"),
   });
 }
-export const overrideSchema = z.object({
-  method: z.string().regex(/^[A-Z]+$/),
-  url: z.url(),
-  status: z.number().int().min(200).max(599),
-  body: z.string(),
-  headers: z.record(z.string(), z.string()).optional(),
-  times: z.number().int().positive().optional(),
-});
-
 export const diagnosticSchema = z.object({
   url: z.url(),
   diagnostic: z.object({

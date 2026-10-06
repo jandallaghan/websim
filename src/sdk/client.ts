@@ -90,16 +90,6 @@ export class InstanceHandle {
   dispatch(request: WireRequest): Promise<WireResponse> {
     return this.client.request(this.path("/dispatch"), "POST", request);
   }
-  override(response: {
-    method: string;
-    url: string;
-    status: number;
-    body: string;
-    headers?: Record<string, string>;
-    times?: number;
-  }): Promise<{ id: string }> {
-    return this.client.request(this.path("/overrides"), "POST", response);
-  }
   reportFailure(url: string, diagnostic: Diagnostic): Promise<void> {
     return this.client.request(this.path("/diagnostics"), "POST", {
       url,

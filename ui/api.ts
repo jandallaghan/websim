@@ -2,8 +2,8 @@ export type Definition = {
   name: string;
   description: string;
   entrypoint: string;
-  defaultSeed: string;
-  seeds: { name: string; description: string }[];
+  defaultScenario: string;
+  scenarios: { name: string; description: string }[];
   modules: { name: string; origin: string; evidence: string }[];
   captures: {
     name: string;

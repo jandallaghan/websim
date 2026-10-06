@@ -19,8 +19,8 @@ export function App() {
     selected,
     setSelected,
     inspection,
-    seed,
-    setSeed,
+    scenario,
+    setScenario,
     error,
     setError,
     busy,
@@ -127,8 +127,8 @@ export function App() {
               selected={selected}
               select={setSelected}
               definition={definition}
-              seed={seed}
-              setSeed={setSeed}
+              scenario={scenario}
+              setScenario={setScenario}
               busy={busy}
               create={create}
             />
