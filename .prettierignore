@@ -1,0 +1,7 @@
+node_modules
+dist
+package-lock.json
+examples/demoblaze/captures
+.websim
+test-results
+playwright-report

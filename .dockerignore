@@ -1,0 +1,16 @@
+.git
+node_modules
+dist
+.websim
+test-results
+playwright-report
+*.tgz
+.env
+.env.*
+*.pem
+*.key
+
+**/raw
+**/*.pcap
+**/*.pcapng
+**/*.keys

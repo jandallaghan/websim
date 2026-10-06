@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Account test fixture</title>
+  </head>
+  <body>
+    <output aria-label="Balance"></output>
+    <form>
+      <label>Amount in GBP <input name="amount" type="number" /></label>
+      <button>Add money</button>
+    </form>
+    <script>
+      const balance = document.querySelector("output");
+      function render(account) {
+        balance.textContent = `£${(account.balance / 100).toFixed(2)}`;
+      }
+      fetch("/api/account")
+        .then((response) => response.json())
+        .then(render);
+      document.querySelector("form").onsubmit = async (event) => {
+        event.preventDefault();
+        const amount = Number(new FormData(event.target).get("amount")) * 100;
+        const response = await fetch("/api/deposits", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ amount }),
+        });
+        render(await response.json());
+      };
+    </script>
+  </body>
+</html>

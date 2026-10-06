@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.websim/
+test-results/
+playwright-report/
+*.tgz
+.DS_Store
+examples/demoblaze/captures/
+captures/
+
+**/captures/
+*.pcap
+*.pcapng
+*.keys

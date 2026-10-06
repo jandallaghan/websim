@@ -1,0 +1,129 @@
+import { startServer } from "../src/server/server.js";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { test, expect } from "@playwright/test";
+import { startCapture } from "../src/capture/index.js";
+import {
+  WebsimClient,
+  createBrowserSession,
+  SimulationRunError,
+} from "../src/index.js";
+import { startBank, banking } from "./fixture-site.js";
+
+test("capture a website, turn off the origin, and run independent stateful browser workflows", async ({
+  browser,
+}) => {
+  const directory = await mkdtemp(join(tmpdir(), "websim-e2e-"));
+  const origin = await startBank();
+  const recorder = await startCapture({
+    url: origin.url,
+    directory: join(directory, "capture"),
+    name: "bank",
+    interfaces: [process.platform === "darwin" ? "lo0" : "lo"],
+    filter: `tcp port ${new URL(origin.url).port}`,
+    chromePath: process.env.WEBSIM_TEST_CHROME,
+    chromeArgs: ["--headless=new", "--no-sandbox"],
+  });
+  await origin.visited;
+  const archive = await recorder.stop();
+  await origin.close(); // Replay cannot succeed by accidentally falling back to the origin.
+  const server = await startServer(banking(origin.url, archive));
+  const client = new WebsimClient(server);
+  const first = await client.createInstance({ seed: "funded" });
+  const second = await client.createInstance({ seed: "empty" });
+  const alice = await createBrowserSession(browser, first);
+  const bob = await createBrowserSession(browser, second);
+  try {
+    const a = await alice.context.newPage();
+    const b = await bob.context.newPage();
+    await Promise.all([a.goto(origin.url), b.goto(origin.url)]);
+    await expect(a.getByLabel("Balance")).toHaveText("10000");
+    await expect(b.getByLabel("Balance")).toHaveText("0");
+    await a.getByLabel("Deposit in cents").fill("5000");
+    await a.getByRole("button", { name: "Deposit" }).click();
+    await expect(a.getByLabel("Balance")).toHaveText("15000");
+    await b.reload();
+    await expect(b.getByLabel("Balance")).toHaveText("0");
+    await a.getByLabel("Deposit in cents").fill("-10");
+    await a.getByRole("button", { name: "Deposit" }).click();
+    await expect(a.getByRole("status", { name: "Deposit result" })).toHaveText(
+      "Enter a positive amount",
+    );
+    await first.assertHealthy();
+    expect((await first.inspect()).state.accounts?.main).toEqual({
+      balance: 15000,
+    });
+    await first.reset();
+    await a.reload();
+    await expect(a.getByLabel("Balance")).toHaveText("10000");
+    await alice.close();
+    await bob.close();
+  } finally {
+    await server.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("application failures, one-shot overrides, diagnostics and authenticated management stay distinct", async () => {
+  const server = await startServer(banking("https://bank.example"));
+  const client = new WebsimClient(server);
+  const instance = await client.createInstance();
+  const request = {
+    url: "https://bank.example/account",
+    method: "GET",
+    headers: {},
+    body: null,
+  };
+  try {
+    expect((await fetch(`${server.url}/api/instances`)).status).toBe(401);
+    expect(
+      (
+        await fetch(`${server.url}/api/instances`, {
+          headers: {
+            authorization: `Bearer ${server.token}`,
+            origin: "https://foreign.example",
+          },
+        })
+      ).status,
+    ).toBe(403);
+    await instance.override({
+      method: "GET",
+      url: request.url,
+      status: 503,
+      body: "Maintenance",
+    });
+    expect((await instance.dispatch(request)).status).toBe(503);
+    await instance.assertHealthy();
+    expect((await instance.dispatch(request)).status).toBe(200);
+    const missing = await instance.dispatch({
+      ...request,
+      url: "https://bank.example/unknown",
+    });
+    expect(missing.status).toBe(502);
+    await expect(instance.assertHealthy()).rejects.toBeInstanceOf(
+      SimulationRunError,
+    );
+    expect((await instance.inspect()).diagnostics[0]?.code).toBe(
+      "UNMATCHED_REQUEST",
+    );
+    await instance.reset();
+    await instance.assertHealthy();
+    // Parallel deposits must not overwrite one another.
+    await Promise.all(
+      Array.from({ length: 20 }, () =>
+        instance.dispatch({
+          url: "https://bank.example/deposit",
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: Buffer.from('{"amount":100}').toString("base64"),
+        }),
+      ),
+    );
+    expect((await instance.inspect()).state.accounts?.main).toEqual({
+      balance: 12000,
+    });
+  } finally {
+    await server.close();
+  }
+});
