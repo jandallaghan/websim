@@ -1,10 +1,16 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import type { SimulationEnv } from "../../../src/index.js";
+import { SimulationError, type SimulationEnv } from "../../../src/index.js";
 export interface Account {
   balance: number;
 }
 export const accounts = new Hono<SimulationEnv>();
+accounts.post("/api/transfers", () => {
+  throw new SimulationError(
+    "UNSUPPORTED_BEHAVIOR",
+    "Transfers have not been captured.",
+  );
+});
 accounts.get("/api/account", (c) =>
   c.json(c.get("simulation").state.get<Account>("accounts", "main")),
 );

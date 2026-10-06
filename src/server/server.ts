@@ -13,6 +13,7 @@ import {
   wireRequestSchema,
   diagnosticSchema,
 } from "./protocol.js";
+import { createSimulationProxy } from "./proxy.js";
 import { WebsimClient } from "../sdk/client.js";
 
 export interface ServerOptions {
@@ -34,13 +35,19 @@ export async function startServer(
   const token = options.token ?? randomBytes(32).toString("hex");
 
   const app = new Hono();
+  const proxies = new Map<string, ReturnType<typeof createSimulationProxy>>();
   const browsers = new Map<string, Promise<RemoteBrowser>>();
   const closeBrowsers = async (id: string): Promise<void> => {
     const browser = browsers.get(id);
     browsers.delete(id);
     if (browser) await (await browser.catch(() => undefined))?.close();
   };
-  const manager = new InstanceManager(definition, closeBrowsers);
+  const manager = new InstanceManager(definition, async (id) => {
+    await closeBrowsers(id);
+    const proxy = proxies.get(id);
+    proxies.delete(id);
+    if (proxy) await (await proxy.catch(() => undefined))?.close();
+  });
   let url = "";
   app.use("*", bodyLimit({ maxSize: 32 * 1024 * 1024 }));
   app.use("/api/*", async (c, next) => {
@@ -136,6 +143,20 @@ export async function startServer(
       .get(c.req.param("id"))!
       .reportFailure(input.url, input.diagnostic);
     return c.body(null, 204);
+  });
+  app.post("/api/instances/:id/proxy", async (c) => {
+    const id = c.req.param("id");
+    if (!proxies.has(id)) {
+      const pending = createSimulationProxy(manager.get(id)!);
+      proxies.set(id, pending);
+      pending.catch(() => {
+        if (proxies.get(id) === pending) proxies.delete(id);
+      });
+    }
+    return c.json({
+      url: (await proxies.get(id)!).url,
+      time: manager.get(id)!.info().time,
+    });
   });
   app.post("/api/instances/:id/open", async (c) => {
     if (!options.browser)

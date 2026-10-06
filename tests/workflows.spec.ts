@@ -30,7 +30,10 @@ test("capture a website, turn off the origin, and run independent stateful brows
   await origin.close(); // Replay cannot succeed by accidentally falling back to the origin.
   const server = await startServer(banking(origin.url, archive));
   const client = new WebsimClient(server);
-  const first = await client.createInstance({ scenario: "funded" });
+  const first = await client.createInstance({
+    scenario: "funded",
+    time: "2026-10-06T12:00:00.000Z",
+  });
   const second = await client.createInstance({ scenario: "empty" });
   const alice = await createBrowserSession(browser, first);
   const bob = await createBrowserSession(browser, second);
@@ -38,6 +41,14 @@ test("capture a website, turn off the origin, and run independent stateful brows
     const a = await alice.context.newPage();
     const b = await bob.context.newPage();
     await Promise.all([a.goto(origin.url), b.goto(origin.url)]);
+    const browserTime = await a.evaluate(() => Date.now());
+    expect(browserTime).toBeGreaterThanOrEqual(
+      Date.parse("2026-10-06T12:00:00.000Z"),
+    );
+    expect(browserTime).toBeLessThan(Date.parse("2026-10-06T12:01:00.000Z"));
+    await expect
+      .poll(() => a.evaluate(() => Date.now()))
+      .toBeGreaterThan(browserTime);
     await expect(a.getByLabel("Balance")).toHaveText("10000");
     await expect(b.getByLabel("Balance")).toHaveText("0");
     await a.getByLabel("Deposit in cents").fill("5000");

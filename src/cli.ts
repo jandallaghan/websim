@@ -4,6 +4,11 @@ import { spawn } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import { mkdir, writeFile } from "node:fs/promises";
 import { Command } from "commander";
+import {
+  inspectCapture,
+  printCaptureSummary,
+  type InspectOptions,
+} from "./cli/inspect.js";
 
 import { startWorkspace } from "./workspace/server.js";
 
@@ -122,10 +127,7 @@ program
         process.removeListener("SIGTERM", interrupted);
         console.log("Decoding captured traffic…");
         const archive = await session.stop();
-        console.log(
-          `Saved ${archive.manifest.entries.length} HTTP exchanges and ${archive.manifest.websocketFrames.length} WebSocket frames to ${options.output}.`,
-        );
-        for (const warning of archive.manifest.warnings) console.warn(warning);
+        printCaptureSummary(archive);
       }
     },
   );
@@ -152,12 +154,29 @@ program
         directory: options.output,
         name: options.name,
       });
-      console.log(
-        `Imported ${archive.manifest.entries.length} HTTP exchanges.`,
-      );
-      for (const warning of archive.manifest.warnings) console.warn(warning);
+      printCaptureSummary(archive);
     },
   );
+program
+  .command("inspect")
+  .argument("<directory>", "Capture archive directory")
+  .option("--url <text>", "List exchanges whose URL contains this text")
+  .option("--entry <id>", "Read one exchange, including its response body")
+  .option("--warnings", "Read import warnings")
+  .description(
+    "Inspect capture evidence as JSON; defaults to an origin summary",
+  )
+  .action(async (directory: string, options: InspectOptions) => {
+    if (
+      [options.url !== undefined, !!options.entry, !!options.warnings].filter(
+        Boolean,
+      ).length > 1
+    )
+      throw new Error("Choose one of --url, --entry, or --warnings.");
+    console.log(
+      JSON.stringify(await inspectCapture(directory, options), null, 2),
+    );
+  });
 program
   .command("init")
   .argument("<directory>")

@@ -68,7 +68,16 @@ export type FailureCode =
   | "AMBIGUOUS_CAPTURE"
   | "HANDLER_EXCEPTION"
   | "UNSUPPORTED_BEHAVIOR";
+const simulationErrorBrand = Symbol.for("@websim/core/SimulationError");
 export class SimulationError extends Error {
+  readonly [simulationErrorBrand] = true;
+  static is(error: unknown): error is SimulationError {
+    return (
+      error instanceof Error &&
+      simulationErrorBrand in error &&
+      error[simulationErrorBrand] === true
+    );
+  }
   constructor(
     readonly code: FailureCode,
     message: string,
@@ -109,6 +118,8 @@ export interface InstanceOptions {
 }
 export interface InstanceInfo {
   id: string;
+  /** Fixed handler time and starting epoch for the browser clock. */
+  time: string;
   scenario: string;
   createdAt: string;
   expiresAt: string;

@@ -56,15 +56,24 @@ export class Instance {
           }),
       );
       app.onError((error) => {
+        // Preserve Hono's explicit HTTP exceptions; ordinary exceptions are simulation failures.
+        if ("getResponse" in error && typeof error.getResponse === "function")
+          return error.getResponse();
         throw error;
       });
-      app.route("/", module.routes);
+      // Mount handlers directly so Hono cannot turn an authoring exception into an ordinary HTTP 500.
+      // This also avoids relying on Hono's default-error-handler identity across module loaders.
+      for (const route of module.routes.routes)
+        app.on(route.method, route.path, route.handler);
       this.apps.set(module.name, app);
     }
   }
   private initialize(): void {
     let random = (this.options.randomSeed ?? 1) >>> 0;
-    const epoch = this.options.time ?? "2026-01-01T00:00:00.000Z";
+    const epoch =
+      this.options.time ??
+      this.definition.captures?.[0]?.manifest.startedAt ??
+      "2026-01-01T00:00:00.000Z";
     if (!Number.isFinite(Date.parse(epoch)))
       throw new Error("Invalid simulation time");
     this.context = {
@@ -102,6 +111,7 @@ export class Instance {
   info(): InstanceInfo {
     return {
       id: this.id,
+      time: this.context.clock.now().toISOString(),
       scenario: this.scenario,
       createdAt: this.createdAt.toISOString(),
       expiresAt: this.expiresAt.toISOString(),
@@ -191,8 +201,7 @@ export class Instance {
           );
       } catch (error) {
         trace.diagnostic = {
-          code:
-            error instanceof SimulationError ? error.code : "HANDLER_EXCEPTION",
+          code: SimulationError.is(error) ? error.code : "HANDLER_EXCEPTION",
           message: error instanceof Error ? error.message : String(error),
         };
         this.failures.push(trace.diagnostic);

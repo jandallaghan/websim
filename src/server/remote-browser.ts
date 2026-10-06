@@ -1,4 +1,10 @@
-import type { Browser, BrowserContext, Page, Dialog } from "playwright";
+import type {
+  Browser,
+  BrowserContext,
+  Page,
+  Dialog,
+  CDPSession,
+} from "playwright";
 import { z } from "zod";
 import { createBrowserSession } from "../sdk/browser.js";
 import type { InstanceHandle } from "../sdk/client.js";
@@ -39,6 +45,7 @@ export class RemoteBrowser {
   ) {}
   private dialog?: Dialog;
   private image: string | null = null;
+  private readonly captures = new WeakMap<Page, Promise<CDPSession>>();
   static async open(
     browser: Browser,
     instance: InstanceHandle,
@@ -75,13 +82,21 @@ export class RemoteBrowser {
   async frame() {
     if (!this.dialog) {
       try {
-        this.image = (
-          await this.page.screenshot({
-            type: "jpeg",
-            quality: 75,
-            timeout: 3000,
-          })
-        ).toString("base64");
+        let capture = this.captures.get(this.page);
+        if (!capture) {
+          capture = this.context.newCDPSession(this.page);
+          this.captures.set(this.page, capture);
+        }
+        // A live view needs the current compositor frame, without waiting for fonts or layout stability.
+        const { data } = await (
+          await capture
+        ).send("Page.captureScreenshot", {
+          format: "jpeg",
+          quality: 75,
+          fromSurface: true,
+          captureBeyondViewport: false,
+        });
+        this.image = data;
       } catch (error) {
         if (!this.dialog) throw error;
       }

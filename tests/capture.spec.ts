@@ -77,7 +77,8 @@ test("capture encrypted Chrome traffic, import HTTP/1 and multiplexed HTTP/2, an
   );
   await new Promise<void>((resolve) => h1.listen(0, "127.0.0.1", resolve));
   const h1Port = (h1.address() as { port: number }).port;
-  const html = `<!doctype html><h1>Captured shop</h1><output>loading</output><script>
+  const html = `<!doctype html><h1>Captured shop</h1><output>loading</output><script src="/application.js"></script>`;
+  const application = `
     (async () => {
       const results = await Promise.all([
         fetch('/upload', {method:'POST', body:new Uint8Array([0,255,128,1,2])}).then(r=>r.arrayBuffer()),
@@ -92,7 +93,7 @@ test("capture encrypted Chrome traffic, import HTTP/1 and multiplexed HTTP/2, an
       await new Promise((resolve,reject) => { socket.onopen=()=>socket.send('stock:123'); let messages=0; socket.onmessage=()=>{ if (++messages === 1) socket.send(new Uint8Array([0,255,128])); else {socket.close();resolve();} }; socket.onerror=reject; });
       await fetch('/done');
     })().catch(e=>fetch('/failed?error='+encodeURIComponent(e.message)));
-  </script>`;
+  `;
   let failure: string | undefined;
   const h2 = createSecureServer(tls);
   h2.on("request", (req, res) => {
@@ -103,6 +104,14 @@ test("capture encrypted Chrome traffic, import HTTP/1 and multiplexed HTTP/2, an
       if (req.url === "/") {
         res.setHeader("content-type", "text/html");
         res.end(html);
+      } else if (req.url === "/application.js") {
+        const body = gzipSync(application);
+        res.writeHead(200, {
+          "content-type": "text/javascript",
+          "content-encoding": "gzip",
+          "content-length": String(body.length),
+        });
+        res.end(body);
       } else if (req.url === "/asset" || req.url === "/upload") {
         const body = brotliCompressSync(
           req.url === "/asset" ? binary : Buffer.concat(chunks),
@@ -154,6 +163,9 @@ test("capture encrypted Chrome traffic, import HTTP/1 and multiplexed HTTP/2, an
     const entry = (path: string) =>
       entries.find((e) => new URL(e.url).pathname === path)!;
     expect((await archive.body(entry("/"))).toString()).toBe(html);
+    expect((await archive.body(entry("/application.js"))).toString()).toBe(
+      application,
+    );
     expect(new Set(entries.map((e) => e.protocol))).toEqual(
       new Set(["http/1.1", "h2"]),
     );

@@ -90,6 +90,10 @@ export class InstanceHandle {
   dispatch(request: WireRequest): Promise<WireResponse> {
     return this.client.request(this.path("/dispatch"), "POST", request);
   }
+  /** Internal browser transport endpoint, reachable only from the runner's network namespace. */
+  browserProxy(): Promise<{ url: string; time: string }> {
+    return this.client.request(this.path("/proxy"), "POST");
+  }
   reportFailure(url: string, diagnostic: Diagnostic): Promise<void> {
     return this.client.request(this.path("/diagnostics"), "POST", {
       url,

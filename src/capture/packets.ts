@@ -39,6 +39,8 @@ export async function* packets(
     "-o",
     "tcp.desegment_tcp_streams:TRUE",
     "-o",
+    "tcp.reassemble_out_of_order:TRUE",
+    "-o",
     "tls.desegment_ssl_records:TRUE",
     "-o",
     "tls.desegment_ssl_application_data:TRUE",

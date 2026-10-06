@@ -168,10 +168,20 @@ export class HttpDecoder {
       if (fields(node, "http2.body.reassembled.data").length) {
         target.body = [bytes(node, "http2.body.reassembled.data")];
       } else {
-        for (const field of node.children.filter(
-          (field) => field.name === "http2.data.data",
-        )) {
-          if (field.value) target.body.push(Buffer.from(field.value, "hex"));
+        // For a body contained in one DATA frame, Wireshark 4.x puts the
+        // compressed bytes on an unnamed entity field and decoded bytes below
+        // it. Keep the wire body so length validation and decoding happen once.
+        const encoded = node.children.find((field) =>
+          field.show?.startsWith("Content-encoded entity body ("),
+        );
+        if (encoded?.value) {
+          target.body = [Buffer.from(encoded.value, "hex")];
+        } else {
+          for (const field of node.children.filter(
+            (field) => field.name === "http2.data.data",
+          )) {
+            if (field.value) target.body.push(Buffer.from(field.value, "hex"));
+          }
         }
       }
       target.complete = this.endedStreams.has(direction);

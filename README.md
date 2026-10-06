@@ -94,16 +94,27 @@ try {
 }
 ```
 
+Browser time starts at the first capture’s timestamp and advances normally; handler time stays fixed for deterministic state changes. Set `createInstance({ time: "2026-11-10T12:00:00Z" })` to choose another time.
+
 A response such as “invalid password” is normal application behavior. A missing capture match or a broken handler is a simulation error, recorded separately and surfaced by `assertHealthy()`.
 
-The browser runs inside Docker with outbound networking disabled and keeps the website’s original URLs. Your code controls it through a remote Playwright connection; Websim supplies the simulated responses. Capture uses ordinary Chrome without Playwright or a debugging connection.
+The browser runs inside Docker with outbound networking disabled and keeps the website’s original URLs. Your code controls it through a remote Playwright connection. An instance-specific HTTP/HTTPS proxy inside the sandbox supplies captured responses and runs handlers, including for redirects, popups, and service workers. The sandbox browser trusts only the runner’s ephemeral proxy certificate; the host trust store is unchanged. The proxy never connects to the real site. Capture uses ordinary Chrome without Playwright or a debugging connection.
 
-See the [storefront test](tests/demoblaze.spec.ts) for a complete workflow. The package is not published to npm yet; use `npm pack` to install it in another project.
+See the [storefront test](tests/demoblaze.spec.ts) and [travel simulations](examples/README.md) for workflows and their coverage. The package is not published to npm yet; use `npm pack` to install it in another project.
 
 ## Capture details and limits
 
+Inspect a capture before writing handlers. These commands return JSON for you or your coding agent:
+
+```sh
+node dist/cli.js inspect captures/session                     # Origins and exchange counts
+node dist/cli.js inspect captures/session --url /api/search   # Matching requests and entry IDs
+node dist/cli.js inspect captures/session --entry <id>        # Request and response evidence
+node dist/cli.js inspect captures/session --warnings          # Missing or unsupported traffic
+```
+
 - HTTP/1.1 and HTTP/2 are supported. QUIC is disabled during capture.
-- WebSocket frames are recorded as evidence; WebSocket simulation, streaming, and service workers are not supported.
+- WebSocket frames are recorded as evidence; WebSocket simulation and streaming are not supported.
 - The capture SDK exports `startCapture()` and `importCapture()` from `@websim/core/capture`. The CLI can also import an existing PCAP and TLS key file:
 
   ```sh

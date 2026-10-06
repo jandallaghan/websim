@@ -19,7 +19,8 @@ export function RemoteBrowser({
 }) {
   const [frame, setFrame] = useState<Frame>();
   const [address, setAddress] = useState("");
-  const [error, setError] = useState("");
+  const [frameError, setFrameError] = useState("");
+  const [actionError, setActionError] = useState("");
   const queue = useRef(Promise.resolve());
   const editingAddress = useRef(false);
   const image = useRef<HTMLImageElement>(null);
@@ -33,10 +34,11 @@ export function RemoteBrowser({
         const next = await api<Frame>(path);
         if (active) {
           setFrame(next);
+          setFrameError("");
           if (!editingAddress.current) setAddress(next.url);
         }
       } catch (error) {
-        if (active) setError(String(error));
+        if (active) setFrameError(String(error));
       }
       if (active)
         timer = setTimeout(
@@ -54,8 +56,11 @@ export function RemoteBrowser({
     (action: unknown) => {
       activeUntil.current = Date.now() + 700;
       queue.current = queue.current
-        .then(() => api<void>(path, "POST", action))
-        .catch((error) => setError(String(error)));
+        .then(async () => {
+          await api<void>(path, "POST", action);
+          setActionError("");
+        })
+        .catch((error) => setActionError(String(error)));
       return queue.current;
     },
     [path],
@@ -102,7 +107,9 @@ export function RemoteBrowser({
         </Button>
       </div>
       {!frame && <p className="text-sm text-muted-foreground">Connecting…</p>}
-      {error && <p role="alert">{error}</p>}
+      {(actionError || frameError) && (
+        <p role="alert">{actionError || frameError}</p>
+      )}
       {frame?.dialog && (
         <div
           role="dialog"

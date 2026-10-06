@@ -111,6 +111,10 @@ export async function startCapture(
     "-p",
     "-B",
     "64",
+    // The kernel buffer does not size dumpcap's inter-thread queue. Its default
+    // 1 MB queue drops bursts when recording multiple interfaces on busy sites.
+    "-C",
+    String(64 * 1024 * 1024),
     "-f",
     options.filter ?? "tcp",
     ...interfaces.flatMap((name) => ["-i", name]),

@@ -9,41 +9,26 @@ export interface BrowserSession {
   context: BrowserContext;
   close(): Promise<void>;
 }
-/** Preserve original origins and cookies, while fulfilling every HTTP request through Websim. */
+/** Preserve original origins and cookies, while serving HTTP through the instance proxy. */
 export async function createBrowserSession(
   browser: Browser,
   instance: InstanceHandle,
-  options: Omit<BrowserContextOptions, "serviceWorkers"> = {},
+  options: Omit<
+    BrowserContextOptions,
+    "serviceWorkers" | "proxy" | "ignoreHTTPSErrors"
+  > = {},
 ): Promise<BrowserSession> {
+  const proxy = await instance.browserProxy();
   const context = await browser.newContext({
     ...options,
-    serviceWorkers: "block",
+    serviceWorkers: "allow",
+    proxy: { server: proxy.url, bypass: "<-loopback>" },
+    // The terminal proxy presents an ephemeral certificate for captured HTTPS origins.
+    ignoreHTTPSErrors: true,
   });
+  await context.clock.setSystemTime(proxy.time);
   const errors: Error[] = [];
   const reports: Promise<void>[] = [];
-  await context.route("**/*", async (route) => {
-    try {
-      const request = route.request();
-      const response = await instance.dispatch({
-        url: request.url(),
-        method: request.method(),
-        headers: await request.allHeaders(),
-        body: request.postDataBuffer()?.toString("base64") ?? null,
-      });
-      const headers = { ...response.headers };
-      delete headers["content-length"];
-      delete headers["transfer-encoding"];
-      delete headers["content-encoding"];
-      await route.fulfill({
-        status: response.status,
-        headers,
-        body: Buffer.from(response.body, "base64"),
-      });
-    } catch (error) {
-      errors.push(error instanceof Error ? error : new Error(String(error)));
-      await route.abort().catch(() => undefined);
-    }
-  });
   await context.routeWebSocket("**/*", (socket) => {
     errors.push(
       new Error(`WebSocket simulation is not supported: ${socket.url()}`),

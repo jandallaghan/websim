@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { tsImport } from "tsx/esm/api";
 import { chromium } from "playwright";
+import { simulationCertificatePin } from "../server/certificate.js";
 import { startServer } from "../server/server.js";
 import { defineSimulation } from "../runtime/types.js";
 
@@ -14,6 +15,10 @@ const module = await tsImport(
 const exported = module.default?.default ?? module.default;
 const browser = await chromium.launchServer({
   headless: true,
+  // Worker scripts need browser-level trust. Only this runner’s ephemeral key is accepted.
+  args: [
+    `--ignore-certificate-errors-spki-list=${await simulationCertificatePin()}`,
+  ],
   port: 4101,
   host: "127.0.0.1",
 });

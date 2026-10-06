@@ -119,6 +119,31 @@ test("sealed runner supports independent scenario state while blocking browser a
       await first.reset();
       await bank.reload();
       await expect(bank.getByLabel("Balance")).toHaveText("£100.00");
+      const unsupported = await bank.evaluate(async () => {
+        const response = await fetch("/api/transfers", { method: "POST" });
+        return { status: response.status, body: await response.json() };
+      });
+      expect(unsupported).toEqual({
+        status: 502,
+        body: {
+          websim: {
+            code: "UNSUPPORTED_BEHAVIOR",
+            message: "Transfers have not been captured.",
+          },
+        },
+      });
+      expect((await first.inspect()).diagnostics.at(-1)?.code).toBe(
+        "UNSUPPORTED_BEHAVIOR",
+      );
+      await first.reset();
+      // Unknown destinations reach the simulation, not an upstream proxy connection.
+      const missing = await bank.goto(`http://${ip}:8080/proxied`);
+      expect(missing?.status()).toBe(502);
+      expect((await first.inspect()).diagnostics.at(-1)?.code).toBe(
+        "UNMATCHED_REQUEST",
+      );
+      expect((await execute("docker", ["logs", witness])).stdout).toBe(before);
+      await first.reset();
       await session.close();
     } finally {
       await browser.close();
